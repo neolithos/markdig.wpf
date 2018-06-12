@@ -15,7 +15,7 @@ namespace Markdig.Renderers.Xaml.Inlines
     {
         protected override void Write([NotNull] XamlRenderer renderer, [NotNull] DelimiterInline obj)
         {
-            renderer.WriteEscape(obj.ToLiteral());
+            renderer.WriteText(obj.ToLiteral());
             renderer.WriteChildren(obj);
         }
     }

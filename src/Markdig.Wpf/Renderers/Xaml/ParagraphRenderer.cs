@@ -15,14 +15,8 @@ namespace Markdig.Renderers.Xaml
     {
         protected override void Write([NotNull] XamlRenderer renderer, ParagraphBlock obj)
         {
-            if (!renderer.IsFirstInContainer)
-            {
-                renderer.EnsureLine();
-            }
-            renderer.WriteLine("<Paragraph>");
-            renderer.WriteLeafInline(obj);
-            renderer.EnsureLine();
-            renderer.WriteLine("</Paragraph>");
+			using (renderer.BeginParagraph(null))
+				renderer.WriteLeafInline(obj);
         }
     }
 }

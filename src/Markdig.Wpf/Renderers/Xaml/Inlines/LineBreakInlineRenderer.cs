@@ -16,13 +16,7 @@ namespace Markdig.Renderers.Xaml.Inlines
         protected override void Write([NotNull] XamlRenderer renderer, [NotNull] LineBreakInline obj)
         {
             if (obj.IsHard)
-            {
-                renderer.WriteLine("<LineBreak />");
-            }
-            else
-            {
-                renderer.WriteLine();
-            }
+				renderer.WriteNewLine();
         }
     }
 }

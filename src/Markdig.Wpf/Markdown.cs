@@ -5,6 +5,7 @@
 using System;
 using System.IO;
 using System.Windows.Documents;
+using System.Xaml;
 using Markdig.Annotations;
 using Markdig.Renderers;
 using Markdig.Syntax;
@@ -30,14 +31,17 @@ namespace Markdig.Wpf
             pipeline = pipeline ?? new MarkdownPipelineBuilder().Build();
 
             // We override the renderer with our own writer
-            var result = new FlowDocument();
-            var renderer = new WpfRenderer(result);
+            var renderer = new XamlRenderer();
             pipeline.Setup(renderer);
 
             var document = Markdig.Markdown.Parse(markdown, pipeline);
-            renderer.Render(document);
+			using (var xamlReader = (XamlReader)renderer.Render(document))
+			using (var xamlWriter = new XamlObjectWriter(xamlReader.SchemaContext))
+			{
+				XamlServices.Transform(xamlReader, xamlWriter);
 
-            return result;
+				return (FlowDocument)xamlWriter.Result;
+			}
         }
 
         /// <summary>
@@ -72,12 +76,17 @@ namespace Markdig.Wpf
             pipeline = pipeline ?? new MarkdownPipelineBuilder().Build();
 
             // We override the renderer with our own writer
-            var renderer = new XamlRenderer(writer);
+            var renderer = new XamlRenderer();
             pipeline.Setup(renderer);
 
             var document = Markdig.Markdown.Parse(markdown, pipeline);
-            renderer.Render(document);
-            writer.Flush();
+			using (var xamlReader = (XamlReader)renderer.Render(document))
+			using (var xamlWriter = new XamlXmlWriter(writer, xamlReader.SchemaContext))
+			{
+				XamlServices.Transform(xamlReader, xamlWriter, false);
+				xamlWriter.Flush();
+			}
+
 
             return document;
         }

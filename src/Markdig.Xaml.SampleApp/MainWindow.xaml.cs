@@ -35,10 +35,10 @@ namespace Markdig.Xaml.SampleApp
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
             var markdown = File.ReadAllText("Documents/Markdig-readme.md");
-            var xaml = Wpf.Markdown.ToXaml(markdown, BuildPipeline());
-            using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(xaml)))
+			var xaml = Wpf.Markdown.ToXaml(markdown, BuildPipeline());
+			using (var stream = new MemoryStream(Encoding.Unicode.GetBytes(xaml)))
             {
-                var reader = new XamlXmlReader(stream, new MyXamlSchemaContext());
+                var reader = new XamlXmlReader(stream, Renderers.XamlRenderer.todo);
                 var document = XamlReader.Load(reader) as FlowDocument;
                 if (document != null)
                 {

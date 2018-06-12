@@ -15,14 +15,16 @@ namespace Markdig.Renderers.Xaml
     {
         protected override void Write([NotNull] XamlRenderer renderer, QuoteBlock obj)
         {
-            renderer.EnsureLine();
+			using (renderer.BeginParagraph(null))
+				renderer.WriteText("Todo Section");
+            //renderer.EnsureLine();
 
-            renderer.Write("<Section");
-            // Apply quote block styling
-            renderer.Write(" Style=\"{StaticResource {x:Static markdig:Styles.QuoteBlockStyleKey}}\"");
-            renderer.WriteLine(">");
-            renderer.WriteChildren(obj);
-            renderer.WriteLine("</Section>");
+            //renderer.Write("<Section");
+            //// Apply quote block styling
+            //renderer.Write(" Style=\"{StaticResource {x:Static markdig:Styles.QuoteBlockStyleKey}}\"");
+            //renderer.WriteLine(">");
+            //renderer.WriteChildren(obj);
+            //renderer.WriteLine("</Section>");
         }
     }
 }

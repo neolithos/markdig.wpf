@@ -15,7 +15,7 @@ namespace Markdig.Renderers.Xaml.Inlines
     {
         protected override void Write([NotNull] XamlRenderer renderer, [NotNull] HtmlEntityInline obj)
         {
-            renderer.WriteEscape(obj.Transcoded);
+            renderer.WriteText(obj.Transcoded.Text, obj.Transcoded.Start, obj.Transcoded.End);
         }
     }
 }

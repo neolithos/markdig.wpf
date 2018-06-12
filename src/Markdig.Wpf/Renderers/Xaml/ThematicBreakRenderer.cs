@@ -15,14 +15,16 @@ namespace Markdig.Renderers.Xaml
     {
         protected override void Write([NotNull] XamlRenderer renderer, ThematicBreakBlock obj)
         {
-            renderer.EnsureLine();
+			using (renderer.BeginParagraph(null))
+				renderer.WriteText("Todo Thematic");
+            //renderer.EnsureLine();
 
-            renderer.WriteLine("<Paragraph>");
-            renderer.Write("<Line X2=\"1\"");
-            // Apply styling
-            renderer.Write(" Style=\"{StaticResource {x:Static markdig:Styles.ThematicBreakStyleKey}}\"");
-            renderer.WriteLine(" />");
-            renderer.WriteLine("</Paragraph>");
+            //renderer.WriteLine("<Paragraph>");
+            //renderer.Write("<Line X2=\"1\"");
+            //// Apply styling
+            //renderer.Write(" Style=\"{StaticResource {x:Static markdig:Styles.ThematicBreakStyleKey}}\"");
+            //renderer.WriteLine(" />");
+            //renderer.WriteLine("</Paragraph>");
         }
     }
 }

@@ -18,9 +18,7 @@ namespace Markdig.Renderers.Xaml.Inlines
             if (obj.Content.IsEmpty)
                 return;
 
-            renderer.Write("<Run");
-            renderer.Write(" Text=\"").WriteEscape(ref obj.Content).Write("\"");
-            renderer.Write(" />");
+			renderer.WriteText(ref obj.Content);
         }
     }
 }
