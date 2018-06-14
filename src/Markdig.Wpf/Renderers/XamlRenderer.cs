@@ -7,8 +7,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Windows;
@@ -17,686 +15,478 @@ using System.Xaml;
 using Markdig.Annotations;
 using Markdig.Helpers;
 using Markdig.Renderers.Xaml;
+using Markdig.Renderers.Xaml.Extensions;
 using Markdig.Renderers.Xaml.Inlines;
 using Markdig.Syntax;
+using Markdig.Syntax.Inlines;
 
 namespace Markdig.Renderers
 {
-	/// <summary>
-	/// XAML renderer for a Markdown <see cref="MarkdownDocument"/> object.
-	/// </summary>
-	public class XamlRenderer : RendererBase
+    /// <summary>
+    /// XAML renderer for a Markdown <see cref="MarkdownDocument"/> object.
+    /// </summary>
+    public class XamlRenderer : RendererBase
 	{
-		private abstract class XamlNode
-		{
-			public abstract XamlNodeType Type { get; }
-		} // class XamlNode
+        private readonly XamlWriter writer;
+        private readonly Stack<XamlType> xamlTypes = new Stack<XamlType>();
 
-		private sealed class XamlNamespaceDeclaration : XamlNode
-		{
-			public XamlNamespaceDeclaration(NamespaceDeclaration namespaceDeclaration)
-				=> this.NamespaceDeclaration = namespaceDeclaration;
+        private readonly XamlType runType;
+        private readonly XamlMember runTextMember;
 
-			public NamespaceDeclaration NamespaceDeclaration { get; }
-			public override XamlNodeType Type => XamlNodeType.NamespaceDeclaration;
-		} // class XamlNamespaceDeclaration
-		
+        private XamlMember currentContentMember = null; // start a _Items access before the next object
 
-		private sealed class XamlStartObject : XamlNode
-		{
-			public XamlStartObject(XamlType type)
-				=> this.XamlType = type;
+        private bool preserveWhitespace = false; // preserve current whitespaces
+        private bool appendWhiteSpace = false;
+        private bool firstCharOfBlock = true;
+        private readonly StringBuilder textBuffer = new StringBuilder(); // current text buffer to collect all words
 
-			public XamlType XamlType { get; }
-			public override XamlNodeType Type => XamlNodeType.StartObject;
-		} // class XamlStartObject
-
-		private sealed class XamlEndObject : XamlNode
-		{
-			public override XamlNodeType Type => XamlNodeType.EndObject;
-		} // class XamlEndObject
-
-		private sealed class XamlGetObject : XamlNode
-		{
-			public override XamlNodeType Type => XamlNodeType.GetObject;
-		} // class XamlGetObject
-
-		private sealed class XamlStartMember : XamlNode
-		{
-			public XamlStartMember(XamlMember member)
-				=> this.Member = member;
-
-			public XamlMember Member { get; }
-			public override XamlNodeType Type => XamlNodeType.StartMember;
-		} // class XamlStartMember
-
-		private sealed class XamlEndMember : XamlNode
-		{
-			public override XamlNodeType Type => XamlNodeType.EndMember;
-		} // class XamlEndMember
-
-		private sealed class XamlValue : XamlNode
-		{
-			public XamlValue(object value)
-				=> this.Value = value;
-
-			public object Value { get; }
-			public override XamlNodeType Type => XamlNodeType.Value;
-		} // class XamlValue
-
-		private sealed class XamlNodeReader : XamlReader
-		{
-			private readonly XamlSchemaContext schemaContext;
-			private readonly IEnumerator<XamlNode> nodes;
-			private bool isEof = false;
-			private string indent = "";
-
-			public XamlNodeReader(XamlSchemaContext schemaContext, IEnumerable<XamlNode> nodes)
-			{
-				this.schemaContext = schemaContext ?? throw new ArgumentNullException(nameof(schemaContext));
-				this.nodes = nodes.GetEnumerator();
-			}
-
-			protected override void Dispose(bool disposing)
-			{
-				nodes.Dispose();
-				base.Dispose(disposing);
-			}
-
-			public override bool Read()
-			{
-				if (isEof)
-					return false;
-				else if (nodes.MoveNext())
-				{
-					switch(Current)
-					{
-						case XamlNamespaceDeclaration ns:
-							Debug.Print("{0}{1} {2}", indent, Current.Type, ns.NamespaceDeclaration);
-							break;
-						case XamlStartObject o:
-							Debug.Print("{0}{1} {2}", indent, Current.Type, o.XamlType.Name);
-							indent = indent + ". ";
-							break;
-						case XamlStartMember m:
-							Debug.Print("{0}{1} {2}", indent, Current.Type, m.Member.Name);
-							indent = indent + ". ";
-							break;
-						case XamlEndObject eo:
-							indent = indent.Substring(0, indent.Length - 2);
-							Debug.Print("{0}{1}", indent, Current.Type);
-							break;
-						case XamlEndMember em:
-							indent = indent.Substring(0, indent.Length - 2);
-							Debug.Print("{0}{1}", indent, Current.Type);
-							break;
-						case XamlGetObject go:
-							Debug.Print("{0}{1}", indent, Current.Type);
-							indent = indent + ". ";
-							break;
-						case XamlValue v:
-							Debug.Print("{0}{1} {2}", indent, Current.Type, v.Value);
-							break;
-						default:
-							Debug.Print("{0}{1}", indent, Current.Type);
-							break;
-					}
-					return true;
-				}
-				else
-				{
-					isEof = true;
-					return false;
-				}
-			}
-
-			public override bool IsEof => isEof;
-			private XamlNode Current => isEof ? null : nodes.Current;
-
-			public override XamlNodeType NodeType => Current?.Type ?? XamlNodeType.None;
-			public override NamespaceDeclaration Namespace => Current is XamlNamespaceDeclaration nd ? nd.NamespaceDeclaration : null;
-			public override XamlType Type => Current is XamlStartObject t ? t.XamlType : null;
-			public override XamlMember Member => Current is XamlStartMember v ? v.Member : null;
-			public override object Value => Current is XamlValue v ? v.Value : null;
-
-			public override XamlSchemaContext SchemaContext => schemaContext;
-		} // class XamlNodeReader
-
-		private sealed class DisposeAdd : IDisposable
-		{
-			private readonly XamlRenderer renderer;
-			private readonly XamlNode node;
-
-			public DisposeAdd(XamlRenderer renderer, XamlNode node)
-			{
-				this.renderer = renderer;
-				this.node = node;
-			}
-
-			public void Dispose()
-				=> renderer.nodes.Add(node);
-		} // class DisposeAdd
-
-		private sealed class DisposeInvoke : IDisposable
-		{
-			private readonly Action onDispose;
-
-			public DisposeInvoke(Action onDispose)
-				=> this.onDispose = onDispose;
-
-			public void Dispose()
-				=> onDispose.Invoke();
-		} // class DisposeInvoke
-
-		private sealed class DisposeCombine : IDisposable
-		{
-			private readonly IDisposable[] disposes;
-
-			public DisposeCombine(params IDisposable[] disposes)
-				=> this.disposes = disposes;
-
-			public void Dispose()
-				=> Array.ForEach(disposes, c => c.Dispose());
-		} // class DisposeCombine
-
-		private static readonly XamlSchemaContext schemaContext = System.Windows.Markup.XamlReader.GetWpfSchemaContext();
-
-		private static readonly XamlType staticResourceType;
-
-		private static readonly XamlType flowDocumentType;
-
-		private static readonly XamlType paragraphType;
-
-		private static readonly XamlType hyperLinkType;
-		private static readonly XamlType spanType;
-		private static readonly XamlType boldType;
-		private static readonly XamlType italicType;
-		private static readonly XamlType runType;
-		private static readonly XamlType lineBreakType;
-
-		private static readonly XamlMember flowDocumentBlocksMember;
-		private static readonly XamlMember paragraphInlinesMember;
-		private static readonly XamlMember contentStyleMember;
-
-		private static readonly XamlMember hyperLinkCommandMember;
-		private static readonly XamlMember hyperLinkCommandParameterMember;
-		private static readonly XamlMember spanInlinesMember;
-		private static readonly XamlMember runTextMember;
-
-		static XamlRenderer()
-		{
-			staticResourceType= schemaContext.GetXamlType(typeof(StaticResourceExtension));
-			flowDocumentType = schemaContext.GetXamlType(typeof(FlowDocument));
-			flowDocumentBlocksMember = flowDocumentType.GetMember(nameof(FlowDocument.Blocks));
-
-			paragraphType = schemaContext.GetXamlType(typeof(Paragraph));
-			paragraphInlinesMember = paragraphType.GetMember(nameof(Paragraph.Inlines));
-
-			contentStyleMember = flowDocumentType.GetMember(nameof(FrameworkContentElement.Style));
-
-			hyperLinkType = schemaContext.GetXamlType(typeof(Hyperlink));
-			hyperLinkCommandMember = hyperLinkType.GetMember(nameof(Hyperlink.Command));
-			hyperLinkCommandParameterMember = hyperLinkType.GetMember(nameof(Hyperlink.CommandParameter));
-
-			spanType = schemaContext.GetXamlType(typeof(Span));
-			boldType = schemaContext.GetXamlType(typeof(Bold));
-			italicType = schemaContext.GetXamlType(typeof(Italic));
-			spanInlinesMember = spanType.GetMember(nameof(Span.Inlines));
-
-			runType = schemaContext.GetXamlType(typeof(Run));
-			runTextMember = runType.GetMember(nameof(Run.Text));
-
-			lineBreakType = schemaContext.GetXamlType(typeof(LineBreak));
-		} // sctor
-
-		private readonly List<XamlNode> nodes = new List<XamlNode>();
-
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="XamlRenderer"/> class.
-		/// </summary>
-		public XamlRenderer()
+        /// <summary>
+        /// Initializes a new instance of the <see cref="XamlRenderer"/> class.
+        /// </summary>
+        /// <param name="writer">Target for the xaml content.</param>
+        public XamlRenderer(XamlWriter writer)
         {
+            this.writer = writer ?? throw new ArgumentNullException(nameof(writer));
+
+            this.runType = SchemaContext.GetXamlType(typeof(Run)) ?? throw new ArgumentNullException(nameof(Run));
+            this.runTextMember = runType.GetMember(nameof(Run.Text))??throw new ArgumentNullException(nameof(Run.Text));
+
             // Default block renderers
             ObjectRenderers.Add(new CodeBlockRenderer());
             ObjectRenderers.Add(new ListRenderer());
             ObjectRenderers.Add(new HeadingRenderer());
-            ObjectRenderers.Add(new HtmlBlockRenderer());
             ObjectRenderers.Add(new ParagraphRenderer());
             ObjectRenderers.Add(new QuoteBlockRenderer());
             ObjectRenderers.Add(new ThematicBreakRenderer());
 
-            // Default inline renderers
+            //// Default inline renderers
             ObjectRenderers.Add(new AutolinkInlineRenderer());
             ObjectRenderers.Add(new CodeInlineRenderer());
             ObjectRenderers.Add(new DelimiterInlineRenderer());
             ObjectRenderers.Add(new EmphasisInlineRenderer());
             ObjectRenderers.Add(new LineBreakInlineRenderer());
-            ObjectRenderers.Add(new HtmlInlineRenderer());
-            ObjectRenderers.Add(new HtmlEntityInlineRenderer());
             ObjectRenderers.Add(new LinkInlineRenderer());
             ObjectRenderers.Add(new LiteralInlineRenderer());
+
+            // Extension renderers
+            ObjectRenderers.Add(new TableRenderer());
+            ObjectRenderers.Add(new TaskListRenderer());
         }
 
-		[NotNull]
+        #region -- Primitives ---------------------------------------------------------
+
+        /// <summary>Start to write a xaml-object.</summary>
+        /// <param name="type"></param>
+        public XamlType WriteStartObject([NotNull] Type type)
+        {
+            var xamlType = SchemaContext.GetXamlType(type ?? throw new ArgumentNullException(nameof(type)))
+                ?? throw new ArgumentOutOfRangeException(nameof(type), type, "Could not resolve xaml type.");
+
+            return WriteStartObject(xamlType);
+        }
+
+        private XamlType WriteStartObject(XamlType xamlType)
+        {
+            xamlTypes.Push(xamlType);
+
+            // write pending elements
+            WritePendingStartItems();
+            WritePendingText(true);
+
+            writer.WriteStartObject(xamlType);
+
+            return xamlType;
+        }
+
+        /// <summary>Closes the current object.</summary>
+        /// <returns>Current evaluated object or null.</returns>
+        public object WriteEndObject()
+        {
+            // write pending text
+            WritePendingText(false);
+
+            xamlTypes.Pop();
+            writer.WriteEndObject();
+            return GetResult();
+        }
+
+        private object GetResult()
+            => writer is XamlObjectWriter ow
+                ? ow.Result
+                : null;
+
+        /// <summary>Get a xaml member to a member string.</summary>
+        /// <param name="memberName"></param>
+        /// <returns></returns>
+        public XamlMember GetMember([NotNull] string memberName)
+        {
+            var xamlType = xamlTypes.Peek();
+            return xamlType.GetMember(memberName ?? throw new ArgumentNullException(nameof(memberName)));
+        }
+
+        /// <summary>Get a xaml member to a dependency property.</summary>
+        /// <param name="property"></param>
+        /// <returns></returns>
+        public XamlMember GetMember([NotNull] DependencyProperty property)
+        {
+            if (property == null)
+                throw new ArgumentNullException(nameof(property));
+
+            var xamlType = xamlTypes.Peek();
+            if (property.OwnerType.IsAssignableFrom(xamlType.UnderlyingType))
+                return xamlType.GetMember(property.Name);
+            else
+            {
+                var type = SchemaContext.GetXamlType(property.OwnerType);
+                return type.GetAttachableMember(property.Name);
+            }
+        }
+
+        /// <summary>Start a member.</summary>
+        /// <param name="memberName"></param>
+        public void WriteStartMember([NotNull] string memberName)
+            => WriteStartMember(GetMember(memberName));
+
+        /// <summary>Start a member.</summary>
+        /// <param name="property"></param>
+        public void WriteStartMember([NotNull] DependencyProperty property)
+            => WriteStartMember(GetMember(property));
+
+        /// <summary>Start a member.</summary>
+        /// <param name="member"></param>
+        public void WriteStartMember([NotNull] XamlMember member)
+            => writer.WriteStartMember(member ?? throw new ArgumentNullException(nameof(member)));
+
+        /// <summary>End the current member.</summary>
+        public void WriteEndMember()
+        {
+            WritePendingText(false);
+            writer.WriteEndMember();
+        }
+
+        /// <summary>Start a items collection.</summary>
+        /// <param name="memberName"></param>
+        /// <param name="preserveSpaces"></param>
+        public void WriteStartItems(string memberName, bool preserveSpaces = false)
+            => WriteStartItems(GetMember(memberName), preserveSpaces);
+
+        /// <summary>Start a items collection.</summary>
+        /// <param name="property"></param>
+        /// <param name="preserveSpaces"></param>
+        public void WriteStartItems(DependencyProperty property, bool preserveSpaces = false)
+            => WriteStartItems(GetMember(property), preserveSpaces);
+
+        /// <summary>Start a items collection.</summary>
+        /// <param name="member"></param>
+        /// <param name="preserveSpaces"></param>
+        public void WriteStartItems(XamlMember member, bool preserveSpaces = false)
+        {
+            if (currentContentMember != null)
+                throw new InvalidOperationException();
+
+            preserveWhitespace = preserveSpaces;
+            appendWhiteSpace = false;
+            firstCharOfBlock = true;
+            currentContentMember = member;
+        }
+
+        private void WritePendingStartItems()
+        {
+            if (currentContentMember != null)
+            {
+                WriteStartMember(currentContentMember);
+                writer.WriteGetObject();
+                writer.WriteStartMember(XamlLanguage.Items);
+
+                currentContentMember = null;
+            }
+        }
+
+        /// <summary>End a items collection.</summary>
+        public void WriteEndItems()
+        {
+            WritePendingText(false);
+
+            if (currentContentMember == null)
+            {
+                writer.WriteEndMember();
+                writer.WriteEndObject();
+                writer.WriteEndMember();
+            }
+            else
+                currentContentMember = null;
+        }
+
+        /// <summary>Write a complete member.</summary>
+        /// <param name="memberName"></param>
+        /// <param name="value"></param>
+        public void WriteMember([NotNull] string memberName, object value)
+        {
+            if (value != null)
+                WriteMember(GetMember(memberName), value);
+        }
+
+        /// <summary>Write a complete member.</summary>
+        /// <param name="property"></param>
+        /// <param name="value"></param>
+        public void WriteMember([NotNull] DependencyProperty property, object value)
+        {
+            if (value != null)
+                WriteMember(GetMember(property), value);
+        }
+
+        /// <summary>Write a complete member.</summary>
+        /// <param name="member"></param>
+        /// <param name="value"></param>
+        public void WriteMember([NotNull] XamlMember member, object value)
+        {
+            if (value == null)
+                return;
+            if (IsPendingText)
+                throw new InvalidOperationException("Start member during text collection.");
+
+            writer.WriteStartMember(member);
+            if (writer is XamlObjectWriter)
+                writer.WriteValue(value);
+            else
+            {
+                if (!(value is string str))
+                    str = member.TypeConverter.ConverterInstance.ConvertToString(value);
+
+                if (str != null)
+                    writer.WriteValue(str);
+            }
+            writer.WriteEndMember();
+        }
+
+        /// <summary>Write Inline LineBreak</summary>
+        public void WriteLineBreak()
+        {
+            WriteStartObject(typeof(LineBreak));
+            WriteEndObject();
+        }
+
+        /// <summary>Write value</summary>
+        /// <param name="value"></param>
+        public void WriteValue(string value)
+            => WriteText(value);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void AppendChar(char c)
+        {
+            if (Char.IsWhiteSpace(c))
+                appendWhiteSpace = true;
+            else
+            {
+                if (appendWhiteSpace)
+                {
+                    if (!firstCharOfBlock)
+                        textBuffer.Append(' ');
+                    appendWhiteSpace = false;
+                }
+
+                firstCharOfBlock = false;
+                textBuffer.Append(c);
+            }
+        }
+
+        /// <summary>Write normal text.</summary>
+        /// <param name="slice"></param>
+        public void WriteText(ref StringSlice slice)
+        {
+            if (slice.Start > slice.End)
+                return;
+
+            if (preserveWhitespace)
+                textBuffer.Append(slice.Text, slice.Start, slice.Length);
+            else
+            {
+                for (var i = slice.Start; i <= slice.End; i++)
+                {
+                    var c = slice[i];
+                    AppendChar(c);
+                }
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void WriteText([CanBeNull] string text)
+        {
+            if (preserveWhitespace)
+                textBuffer.Append(text);
+            else
+            {
+                var l = text.Length;
+                for (var i = 0; i < l; i++)
+                    AppendChar(text[i]);
+            }
+        }
+
+        private void WritePendingText(bool onStartObject)
+        {
+            if (IsPendingText)
+            {
+                WritePendingStartItems();
+
+                if (preserveWhitespace)
+                {
+                    var t = textBuffer.ToString();
+                    writer.WriteStartObject(runType);
+                    writer.WriteStartMember(runTextMember);
+                    writer.WriteValue(textBuffer.ToString());
+                    writer.WriteEndMember();
+                    writer.WriteEndObject();
+                    textBuffer.Length = 0;
+                }
+                else
+                {
+                    if (appendWhiteSpace && onStartObject)
+                    {
+                        textBuffer.Append(' ');
+                        appendWhiteSpace = false;
+                    }
+
+                    writer.WriteValue(textBuffer.ToString());
+                    textBuffer.Length = 0;
+                }
+            }
+        }
+
+        /// <summary></summary>
+        /// <param name="leafBlock"></param>
+        /// <param name="preserveSpaces"></param>
+        public void WriteItems([NotNull] LeafBlock leafBlock, bool preserveSpaces = false)
+        {
+            if (leafBlock == null)
+                throw new ArgumentNullException(nameof(leafBlock));
+
+            var member = xamlTypes.Peek().ContentProperty ?? throw new ArgumentNullException(nameof(XamlType.ContentProperty));
+            WriteStartItems(member, preserveSpaces);
+
+            if (leafBlock.Inline != null)
+            {
+                WriteChildren(leafBlock.Inline);
+            }
+            else
+            {
+                var lineCount = leafBlock.Lines.Count;
+                var first = true;
+                for (var i = 0; i < lineCount; i++)
+                {
+                    if (first)
+                        first = false;
+                    else if (preserveSpaces)
+                        WriteLineBreak();
+                    else
+                        AppendChar(' ');
+                    
+                    WriteText(ref leafBlock.Lines.Lines[i].Slice);
+                }
+            }
+
+            WriteEndItems();
+        }
+
+        /// <summary></summary>
+        /// <param name="inlines"></param>
+        /// <param name="preserveSpaces"></param>
+        public void WriteItems([NotNull] ContainerInline inlines, bool preserveSpaces = false)
+        {
+            if (inlines == null)
+                throw new ArgumentNullException(nameof(inlines));
+
+            var member = xamlTypes.Peek().ContentProperty ?? throw new ArgumentNullException(nameof(XamlType.ContentProperty));
+            WriteStartItems(member, preserveSpaces);
+            WriteChildren(inlines);
+            WriteEndItems();
+        }
+
+        /// <summary></summary>
+        /// <param name="block"></param>
+        /// <param name="preserveSpaces"></param>
+        public void WriteItems([NotNull] ContainerBlock block, bool preserveSpaces = false)
+        {
+            if (block == null)
+                throw new ArgumentNullException(nameof(block));
+
+            var member = xamlTypes.Peek().ContentProperty ?? throw new ArgumentNullException(nameof(XamlType.ContentProperty));
+            WriteStartItems(member, preserveSpaces);
+            WriteChildren(block);
+            WriteEndItems();
+        }
+
+        private bool IsPendingText => textBuffer.Length > 0;
+
+        #endregion
+
+        /// <summary>Render the markdown object in a XamlWriter.</summary>
+        /// <param name="markdownObject"></param>
+        /// <returns></returns>
+        [NotNull]
 		public override object Render(MarkdownObject markdownObject)
 		{
-			nodes.Clear(); // clear nodes
+            if (markdownObject is MarkdownDocument)
+            {
+                // emit namespaces
+                writer.WriteNamespace(new NamespaceDeclaration("http://schemas.microsoft.com/winfx/2006/xaml", "x"));
+                writer.WriteNamespace(new NamespaceDeclaration("clr-namespace:Markdig.Wpf;assembly=Markdig.Wpf", "markdig"));
 
-			if (markdownObject is MarkdownDocument)
-			{
-				nodes.Add(new XamlNamespaceDeclaration(new NamespaceDeclaration("http://schemas.microsoft.com/winfx/2006/xaml", "x")));
-				nodes.Add(new XamlNamespaceDeclaration(new NamespaceDeclaration("clr-namespace:Markdig.Wpf;assembly=Markdig.Wpf", "markdig")));
-				using (BeginObject(flowDocumentType))
-				{
-					WriteStaticResourceMember(contentStyleMember, "markdig:Styles.DocumentStyleKey");
-					using (BeginAddChilds(flowDocumentBlocksMember))
-						Write(markdownObject);
-				}
-			}
-			else
-				Write(markdownObject);
+                // start flow document
+                WriteStartObject(typeof(FlowDocument));
 
-			return new XamlNodeReader(schemaContext, nodes);
-		}
+                //WriteStartItems(nameof(FlowDocument.Resources));
+                //WriteEndItems();
+                
+                 WriteStaticResourceMember(null, "markdig:Styles.DocumentStyleKey");
+                
+                WriteStartItems(nameof(FlowDocument.Blocks));
 
+                Write(markdownObject);
 
-		internal IDisposable BeginObject(XamlType type)
-		{
-			nodes.Add(new XamlStartObject(type));
-			return new DisposeAdd(this, new XamlEndObject());
-		}
+                WriteEndItems();
+                return WriteEndObject();
+            }
+            else
+            {
+                Write(markdownObject);
+                return GetResult();
+            }
+	    }
 
-		private IDisposable BeginMember(XamlMember member)
-		{
-			nodes.Add(new XamlStartMember(member));
-			return new DisposeAdd(this, new XamlEndMember());
-		}
+        /// <summary>Acces to current schema context.</summary>
+        public XamlSchemaContext SchemaContext => writer.SchemaContext;
 
-		internal IDisposable BeginAddChilds(XamlMember member)
-		{
-			nodes.Add(new XamlStartMember(member));
-			nodes.Add(new XamlGetObject());
-			nodes.Add(new XamlStartMember(XamlLanguage.Items));
+        internal void WriteStaticResourceMember(XamlMember member, string value)
+        {
+            WriteStartMember(member ?? GetMember("Style"));
+            WriteStartObject(typeof(StaticResourceExtension));
+            WriteStartMember(XamlLanguage.PositionalParameters);
 
-			return new DisposeInvoke(EndAddChilds);
-		} 
+            WriteStartObject(XamlLanguage.Static);
+            WriteStartMember(XamlLanguage.PositionalParameters);
 
-		private void EndAddChilds()
-		{
-			nodes.Add(new XamlEndMember());
-			nodes.Add(new XamlEndObject());
-			nodes.Add(new XamlEndMember());
-		}
+            writer.WriteValue(value);
+
+            WriteEndMember();
+            WriteEndObject();
 
 
-		internal void WriteMember(XamlMember member, string value)
-		{
-			if (value == null)
-				return;
+            WriteEndMember();
+            WriteEndObject();
+            WriteEndMember();
+        }
 
-			nodes.Add(new XamlStartMember(member));
-			nodes.Add(new XamlValue(value));
-			nodes.Add(new XamlEndMember());
-		}
+        //private void WriteStaticMember(XamlMember member, string value)
+        //{
+        //	nodes.Add(new XamlStartMember(member));
+        //	nodes.Add(new XamlStartObject(XamlLanguage.Static));
+        //	nodes.Add(new XamlStartMember(XamlLanguage.PositionalParameters));
 
-		internal void WriteStaticResourceMember(XamlMember member, string value)
-		{
-			nodes.Add(new XamlStartMember(member));
-			nodes.Add(new XamlStartObject(staticResourceType));
-			nodes.Add(new XamlStartMember(XamlLanguage.PositionalParameters));
+        //	nodes.Add(new XamlValue(value));
 
-			nodes.Add(new XamlStartObject(XamlLanguage.Static));
-			nodes.Add(new XamlStartMember(XamlLanguage.PositionalParameters));
-
-			nodes.Add(new XamlValue(value));
-
-			nodes.Add(new XamlEndMember());
-			nodes.Add(new XamlEndObject());
-
-			nodes.Add(new XamlEndMember());
-			nodes.Add(new XamlEndObject());
-			nodes.Add(new XamlEndMember());
-		}
-
-		private void WriteStaticMember(XamlMember member, string value)
-		{
-			nodes.Add(new XamlStartMember(member));
-			nodes.Add(new XamlStartObject(XamlLanguage.Static));
-			nodes.Add(new XamlStartMember(XamlLanguage.PositionalParameters));
-
-			nodes.Add(new XamlValue(value));
-
-			nodes.Add(new XamlEndMember());
-			nodes.Add(new XamlEndObject());
-			nodes.Add(new XamlEndMember());
-		}
-
-		internal IDisposable BeginHyperlink(string url)
-		{
-			var r1 = BeginObject(hyperLinkType);
-
-			WriteStaticMember(hyperLinkCommandMember, "markdig:Commands.Hyperlink");
-			WriteMember(hyperLinkCommandParameterMember, url);
-
-			var r2 = BeginAddChilds(spanInlinesMember);
-
-			return new DisposeCombine(r2, r1);
-		}
-
-		internal IDisposable BeginBold()
-		{
-			var r1 = BeginObject(boldType);
-			var r2 = BeginAddChilds(spanInlinesMember);
-			return new DisposeCombine(r2, r1);
-		}
-
-		internal IDisposable BeginItalic()
-		{
-			var r1 = BeginObject(italicType);
-			var r2 = BeginAddChilds(spanInlinesMember);
-			return new DisposeCombine(r2, r1);
-		}
-
-		internal IDisposable BeginSpan(string staticResourceKey = null)
-		{
-			var r1 = BeginObject(spanType);
-			if (staticResourceKey != null)
-				WriteStaticResourceMember(contentStyleMember, staticResourceKey);
-			var r2 = BeginAddChilds(spanInlinesMember);
-			return new DisposeCombine(r2, r1);
-		}
-
-		internal IDisposable BeginParagraph(string staticResourceKey)
-		{
-			var r1 = BeginObject(paragraphType);
-
-			if (staticResourceKey != null)
-				WriteStaticResourceMember(contentStyleMember, staticResourceKey);
-			
-			var r2 = BeginAddChilds(paragraphInlinesMember);
-
-			return new DisposeCombine(r2, r1);
-		}
-
-		internal void WriteText(ref StringSlice text)
-		{
-			if (!text.IsEmpty)
-				WriteText(text.Text, text.Start, text.End);
-		}
-
-		internal void WriteText(string text, int start, int end)
-		{
-			if (start == 0 && text.Length == end)
-				WriteText(text);
-			else
-				WriteText(text.Substring(start, end - start + 1));
-		}
-
-		internal void WriteText(string text)
-			=> WriteText(null, text);
-
-		internal void WriteText(ResourceKey style, string text)
-		{
-			using (BeginObject(runType))
-			{
-				//	WriteResourceMember(contentStyleMember, style);
-				WriteMember(runTextMember, text);
-			}
-		}
-
-		internal void WriteNewLine()
-		{
-			nodes.Add(new XamlStartObject(lineBreakType));
-			nodes.Add(new XamlEndObject());
-		}
-
-		/// <summary>
-		/// Writes the inlines of a leaf inline.
-		/// </summary>
-		/// <param name="leafBlock">The leaf block.</param>
-		/// <returns>This instance</returns>
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		internal void WriteLeafInline([NotNull] LeafBlock leafBlock)
-		{
-			if (leafBlock == null)
-				throw new ArgumentNullException(nameof(leafBlock));
-
-			var inline = (Syntax.Inlines.Inline)leafBlock.Inline;
-			while (inline != null)
-			{
-				Write(inline);
-				inline = inline.NextSibling;
-			}
-		}
-		internal void WriteRawLines([NotNull] LeafBlock leafBlock, bool writeEndOfLines)
-		{
-			if (leafBlock == null)
-				throw new ArgumentNullException(nameof(leafBlock));
-
-			if (leafBlock.Lines.Lines != null)
-			{
-				var lines = leafBlock.Lines;
-				var slices = lines.Lines;
-				for (var i = 0; i < lines.Count; i++)
-				{
-					WriteText(ref slices[i].Slice);
-					if (writeEndOfLines)
-						WriteNewLine();
-				}
-			}
-		}
-
-		public static XamlSchemaContext todo => schemaContext;
-
-		///// <summary>
-		///// Writes the content escaped for XAML.
-		///// </summary>
-		///// <param name="content">The content.</param>
-		///// <returns>This instance</returns>
-		//[NotNull]
-		//[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		//public XamlRenderer WriteEscape([CanBeNull] string content)
-		//{
-		//    if (string.IsNullOrEmpty(content))
-		//        return this;
-
-		//    WriteEscape(content, 0, content.Length);
-		//    return this;
-		//}
-
-		///// <summary>
-		///// Writes the content escaped for XAML.
-		///// </summary>
-		///// <param name="slice">The slice.</param>
-		///// <param name="softEscape">Only escape &lt; and &amp;</param>
-		///// <returns>This instance</returns>
-		//[NotNull]
-		//[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		//public XamlRenderer WriteEscape(ref StringSlice slice, bool softEscape = false)
-		//{
-		//    if (slice.Start > slice.End)
-		//    {
-		//        return this;
-		//    }
-		//    return WriteEscape(slice.Text, slice.Start, slice.Length, softEscape);
-		//}
-
-		///// <summary>
-		///// Writes the content escaped for XAML.
-		///// </summary>
-		///// <param name="slice">The slice.</param>
-		///// <param name="softEscape">Only escape &lt; and &amp;</param>
-		///// <returns>This instance</returns>
-		//[NotNull]
-		//[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		//public XamlRenderer WriteEscape(StringSlice slice, bool softEscape = false)
-		//{
-		//    return WriteEscape(ref slice, softEscape);
-		//}
-
-		///// <summary>
-		///// Writes the content escaped for XAML.
-		///// </summary>
-		///// <param name="content">The content.</param>
-		///// <param name="offset">The offset.</param>
-		///// <param name="length">The length.</param>
-		///// <param name="softEscape">Only escape &lt; and &amp;</param>
-		///// <returns>This instance</returns>
-		//[NotNull]
-		//public XamlRenderer WriteEscape([CanBeNull] string content, int offset, int length, bool softEscape = false)
-		//{
-		//    if (string.IsNullOrEmpty(content) || length == 0)
-		//        return this;
-
-		//    var end = offset + length;
-		//    var previousOffset = offset;
-		//    for (; offset < end; offset++)
-		//    {
-		//        switch (content[offset])
-		//        {
-		//            case '<':
-		//                Write(content, previousOffset, offset - previousOffset);
-		//                if (EnableHtmlEscape)
-		//                {
-		//                    Write("&lt;");
-		//                }
-		//                previousOffset = offset + 1;
-		//                break;
-
-		//            case '>':
-		//                if (!softEscape)
-		//                {
-		//                    Write(content, previousOffset, offset - previousOffset);
-		//                    if (EnableHtmlEscape)
-		//                    {
-		//                        Write("&gt;");
-		//                    }
-		//                    previousOffset = offset + 1;
-		//                }
-		//                break;
-
-		//            case '&':
-		//                Write(content, previousOffset, offset - previousOffset);
-		//                if (EnableHtmlEscape)
-		//                {
-		//                    Write("&amp;");
-		//                }
-		//                previousOffset = offset + 1;
-		//                break;
-
-		//            case '"':
-		//                if (!softEscape)
-		//                {
-		//                    Write(content, previousOffset, offset - previousOffset);
-		//                    if (EnableHtmlEscape)
-		//                    {
-		//                        Write("&quot;");
-		//                    }
-		//                    previousOffset = offset + 1;
-		//                }
-		//                break;
-		//        }
-		//    }
-
-		//    Write(content, previousOffset, end - previousOffset);
-		//    return this;
-		//}
-
-		///// <summary>
-		///// Writes the URL escaped for XAML.
-		///// </summary>
-		///// <param name="content">The content.</param>
-		///// <returns>This instance</returns>
-		//[NotNull]
-		//public XamlRenderer WriteEscapeUrl([CanBeNull] string content)
-		//{
-		//    if (content == null)
-		//        return this;
-
-		//    var previousPosition = 0;
-		//    var length = content.Length;
-
-		//    for (var i = 0; i < length; i++)
-		//    {
-		//        var c = content[i];
-
-		//        if (c < 128)
-		//        {
-		//            var escape = HtmlHelper.EscapeUrlCharacter(c);
-		//            if (escape != null)
-		//            {
-		//                Write(content, previousPosition, i - previousPosition);
-		//                previousPosition = i + 1;
-		//                Write(escape);
-		//            }
-		//        }
-		//        else
-		//        {
-		//            Write(content, previousPosition, i - previousPosition);
-		//            previousPosition = i + 1;
-
-		//            byte[] bytes;
-		//            if (c >= '\ud800' && c <= '\udfff' && previousPosition < length)
-		//            {
-		//                bytes = Encoding.UTF8.GetBytes(new[] { c, content[previousPosition] });
-		//                // Skip next char as it is decoded above
-		//                i++;
-		//                previousPosition = i + 1;
-		//            }
-		//            else
-		//            {
-		//                bytes = Encoding.UTF8.GetBytes(new[] { c });
-		//            }
-
-		//            foreach (var t in bytes)
-		//            {
-		//                Write($"%{t:X2}");
-		//            }
-		//        }
-		//    }
-
-		//    Write(content, previousPosition, length - previousPosition);
-		//    return this;
-		//}
-
-		///// <summary>
-		///// Writes the lines of a <see cref="LeafBlock"/>
-		///// </summary>
-		///// <param name="leafBlock">The leaf block.</param>
-		///// <param name="writeEndOfLines">if set to <c>true</c> write end of lines.</param>
-		///// <param name="escape">if set to <c>true</c> escape the content for XAML</param>
-		///// <param name="softEscape">Only escape &lt; and &amp;</param>
-		///// <returns>This instance</returns>
-		//[NotNull]
-		//public XamlRenderer WriteLeafRawLines([NotNull] LeafBlock leafBlock, bool writeEndOfLines, bool escape, bool softEscape = false)
-		//{
-		//    if (leafBlock == null) throw new ArgumentNullException(nameof(leafBlock));
-		//    if (leafBlock.Lines.Lines != null)
-		//    {
-		//        var lines = leafBlock.Lines;
-		//        var slices = lines.Lines;
-		//        for (var i = 0; i < lines.Count; i++)
-		//        {
-		//            if (!writeEndOfLines && i > 0)
-		//            {
-		//                WriteLine();
-		//            }
-		//            if (escape)
-		//            {
-		//                WriteEscape(ref slices[i].Slice, softEscape);
-		//            }
-		//            else
-		//            {
-		//                Write(ref slices[i].Slice);
-		//            }
-		//            if (writeEndOfLines)
-		//            {
-		//                WriteLine();
-		//            }
-		//        }
-		//    }
-		//    return this;
-		//}
-	}
+        //	nodes.Add(new XamlEndMember());
+        //	nodes.Add(new XamlEndObject());
+        //	nodes.Add(new XamlEndMember());
+        //}
+    }
 }

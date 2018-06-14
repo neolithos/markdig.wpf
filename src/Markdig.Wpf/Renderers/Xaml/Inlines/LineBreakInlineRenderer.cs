@@ -13,10 +13,15 @@ namespace Markdig.Renderers.Xaml.Inlines
     /// <seealso cref="Xaml.XamlObjectRenderer{T}" />
     public class LineBreakInlineRenderer : XamlObjectRenderer<LineBreakInline>
     {
+        /// <summary></summary>
+        /// <param name="renderer"></param>
+        /// <param name="obj"></param>
         protected override void Write([NotNull] XamlRenderer renderer, [NotNull] LineBreakInline obj)
         {
             if (obj.IsHard)
-				renderer.WriteNewLine();
+                renderer.WriteLineBreak();
+            else // Soft line break.
+                renderer.WriteText(" ");
         }
     }
 }

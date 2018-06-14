@@ -2,8 +2,11 @@
 // This file is licensed under the MIT license.
 // See the LICENSE.md file in the project root for more information.
 
+using System;
+using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Controls;
-using System.Xaml;
+using System.Windows.Documents;
 using Markdig.Annotations;
 using Markdig.Syntax.Inlines;
 
@@ -15,33 +18,48 @@ namespace Markdig.Renderers.Xaml.Inlines
     /// <seealso cref="Xaml.XamlObjectRenderer{T}" />
     public class LinkInlineRenderer : XamlObjectRenderer<LinkInline>
     {
-		private static readonly XamlType imageType;
-			private static readonly XamlMember styleMember;
-			private static readonly XamlMember sourceMember;
-
-		static LinkInlineRenderer()
-		{
-			imageType = XamlRenderer.todo.GetXamlType(typeof(Image));
-			styleMember = imageType.GetMember(nameof(Image.Style)); // FrameworkElement.Style
-			sourceMember = imageType.GetMember(nameof(Image.Source));
-		}
-
-        protected override void Write([NotNull] XamlRenderer renderer, [NotNull] LinkInline obj)
+        /// <summary></summary>
+        /// <param name="renderer"></param>
+        /// <param name="link"></param>
+        protected override void Write([NotNull] XamlRenderer renderer, [NotNull] LinkInline link)
         {
-			var url = obj.GetDynamicUrl?.Invoke() ?? obj.Url;
-			if (obj.IsImage)
-			{
-				using (renderer.BeginObject(imageType))
-				{
-					renderer.WriteStaticResourceMember(styleMember, "markdig:Styles.ImageStyleKey");
-					renderer.WriteMember(sourceMember, url);
-				}
-			}
-			else
-			{
-				using (renderer.BeginHyperlink(url))
-					renderer.WriteChildren(obj);
-			}
+            var url = link.GetDynamicUrl != null ? link.GetDynamicUrl() ?? link.Url : link.Url;
+
+            if (link.IsImage)
+            {
+                if (!Uri.IsWellFormedUriString(url, UriKind.RelativeOrAbsolute))
+                    url = "#";
+
+                renderer.WriteStartObject(typeof(Image));
+                renderer.WriteStaticResourceMember(null, "markdig:Styles.ImageStyleKey");
+                renderer.WriteMember(Image.SourceProperty, new Uri(url, UriKind.RelativeOrAbsolute));
+                renderer.WriteEndObject();
+            }
+            else
+            {
+                WriteStartHyperlink(renderer, url, link.Title);
+                renderer.WriteItems(link);
+                WriteEndHyperlink(renderer);
+            }
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void WriteStartHyperlink(XamlRenderer renderer, string url, string linkTitle)
+        {
+            if (!Uri.IsWellFormedUriString(url, UriKind.RelativeOrAbsolute))
+                url = "#";
+
+            renderer.WriteStartObject(typeof(Hyperlink));
+            renderer.WriteStaticResourceMember(null, "markdig:Styles.HyperlinkStyleKey");
+            //renderer.WriteMember(Hyperlink.CommandProperty, Commands.Hyperlink);
+            //renderer.WriteMember(Hyperlink.CommandParameterProperty, url);
+            renderer.WriteMember(Hyperlink.NavigateUriProperty, new Uri(url, UriKind.RelativeOrAbsolute));
+            renderer.WriteMember(FrameworkContentElement.ToolTipProperty, String.IsNullOrEmpty(linkTitle) ? url : linkTitle);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void WriteEndHyperlink(XamlRenderer renderer)
+            => renderer.WriteEndObject();
+
     }
 }

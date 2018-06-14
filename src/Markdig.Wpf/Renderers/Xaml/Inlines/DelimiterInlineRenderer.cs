@@ -13,6 +13,9 @@ namespace Markdig.Renderers.Xaml.Inlines
     /// <seealso cref="Xaml.XamlObjectRenderer{T}" />
     public class DelimiterInlineRenderer : XamlObjectRenderer<DelimiterInline>
     {
+        /// <summary></summary>
+        /// <param name="renderer"></param>
+        /// <param name="obj"></param>
         protected override void Write([NotNull] XamlRenderer renderer, [NotNull] DelimiterInline obj)
         {
             renderer.WriteText(obj.ToLiteral());

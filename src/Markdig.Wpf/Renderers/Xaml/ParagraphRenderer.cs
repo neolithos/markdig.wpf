@@ -2,6 +2,7 @@
 // This file is licensed under the MIT license.
 // See the LICENSE.md file in the project root for more information.
 
+using System.Windows.Documents;
 using Markdig.Annotations;
 using Markdig.Syntax;
 
@@ -13,10 +14,14 @@ namespace Markdig.Renderers.Xaml
     /// <seealso cref="Xaml.XamlObjectRenderer{T}" />
     public class ParagraphRenderer : XamlObjectRenderer<ParagraphBlock>
     {
-        protected override void Write([NotNull] XamlRenderer renderer, ParagraphBlock obj)
+        /// <summary></summary>
+        /// <param name="renderer"></param>
+        /// <param name="paragraph"></param>
+        protected override void Write([NotNull] XamlRenderer renderer, ParagraphBlock paragraph)
         {
-			using (renderer.BeginParagraph(null))
-				renderer.WriteLeafInline(obj);
+            renderer.WriteStartObject(typeof(Paragraph));
+            renderer.WriteItems(paragraph);
+            renderer.WriteEndObject();
         }
     }
 }

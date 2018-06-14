@@ -13,18 +13,20 @@ namespace Markdig.Renderers.Xaml
     /// <seealso cref="Xaml.XamlObjectRenderer{T}" />
     public class ThematicBreakRenderer : XamlObjectRenderer<ThematicBreakBlock>
     {
+        /// <summary></summary>
+        /// <param name="renderer"></param>
+        /// <param name="obj"></param>
         protected override void Write([NotNull] XamlRenderer renderer, ThematicBreakBlock obj)
         {
-			using (renderer.BeginParagraph(null))
-				renderer.WriteText("Todo Thematic");
-            //renderer.EnsureLine();
+            //var line = new System.Windows.Shapes.Line { X2 = 1 };
+            //line.SetResourceReference(FrameworkContentElement.StyleProperty, Styles.ThematicBreakStyleKey);
 
-            //renderer.WriteLine("<Paragraph>");
-            //renderer.Write("<Line X2=\"1\"");
-            //// Apply styling
-            //renderer.Write(" Style=\"{StaticResource {x:Static markdig:Styles.ThematicBreakStyleKey}}\"");
-            //renderer.WriteLine(" />");
-            //renderer.WriteLine("</Paragraph>");
+            //var paragraph = new Paragraph
+            //{
+            //    Inlines = { new InlineUIContainer(line) }
+            //};
+
+            //renderer.WriteBlock(paragraph);
         }
     }
 }

@@ -2,8 +2,12 @@
 // This file is licensed under the MIT license.
 // See the LICENSE.md file in the project root for more information.
 
+using System;
+using System.Windows;
+using System.Windows.Documents;
 using Markdig.Annotations;
 using Markdig.Syntax.Inlines;
+using Markdig.Wpf;
 
 namespace Markdig.Renderers.Xaml.Inlines
 {
@@ -13,10 +17,16 @@ namespace Markdig.Renderers.Xaml.Inlines
     /// <seealso cref="Xaml.XamlObjectRenderer{T}" />
     public class AutolinkInlineRenderer : XamlObjectRenderer<AutolinkInline>
     {
-        protected override void Write([NotNull] XamlRenderer renderer, [NotNull] AutolinkInline obj)
+        /// <summary></summary>
+        /// <param name="renderer"></param>
+        /// <param name="link"></param>
+        protected override void Write([NotNull] XamlRenderer renderer, [NotNull] AutolinkInline link)
         {
-			using (renderer.BeginHyperlink(obj.Url))
-				renderer.WriteText(obj.Url);
+            var url = link.Url;
+
+            LinkInlineRenderer.WriteStartHyperlink(renderer, url, url);
+            renderer.WriteText(url);
+            LinkInlineRenderer.WriteEndHyperlink(renderer);
         }
     }
 }

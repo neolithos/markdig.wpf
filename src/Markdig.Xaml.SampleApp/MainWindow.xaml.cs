@@ -34,17 +34,17 @@ namespace Markdig.Xaml.SampleApp
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
-            var markdown = File.ReadAllText("Documents/Markdig-readme.md");
+			var markdown = File.ReadAllText("Documents/Markdig-readme.md");
 			var xaml = Wpf.Markdown.ToXaml(markdown, BuildPipeline());
+			//File.WriteAllText("d:\\temp\\text.xml", xaml);
 			using (var stream = new MemoryStream(Encoding.Unicode.GetBytes(xaml)))
             {
-                var reader = new XamlXmlReader(stream, Renderers.XamlRenderer.todo);
-                var document = XamlReader.Load(reader) as FlowDocument;
-                if (document != null)
-                {
-                    Viewer.Document = document;
-                }
-            }
+                var reader = new XamlXmlReader(stream, XamlReader.GetWpfSchemaContext());
+				if (XamlReader.Load(reader) is FlowDocument document)
+					Viewer.Document = document;
+				else
+					MessageBox.Show("Result is no FlowDocument?");
+			}
         }
 
         private void OpenHyperlink(object sender, System.Windows.Input.ExecutedRoutedEventArgs e)

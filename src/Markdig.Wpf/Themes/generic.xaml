@@ -14,11 +14,15 @@
     <Setter Property="Background" Value="#ffd3d3d3" />
     <Setter Property="FontFamily" Value="Consolas, Lucida Sans Typewriter, Courier New" />
   </Style>
-  <Style TargetType="{x:Type Run}" x:Key="{x:Static markdig:Styles.CodeStyleKey}">
-    <Setter Property="Background" Value="#ffd3d3d3" />
-    <Setter Property="FontFamily" Value="Consolas, Lucida Sans Typewriter, Courier New" />
-  </Style>
-  <Style TargetType="{x:Type Paragraph}" x:Key="{x:Static markdig:Styles.Heading1StyleKey}">
+	<Style TargetType="{x:Type Span}" x:Key="{x:Static markdig:Styles.CodeStyleKey}">
+		<Setter Property="Background" Value="#ffd3d3d3" />
+		<Setter Property="FontFamily" Value="Consolas, Lucida Sans Typewriter, Courier New" />
+	</Style>
+	<Style TargetType="{x:Type Hyperlink}" x:Key="{x:Static markdig:Styles.HyperlinkStyleKey}">
+		<Setter Property="Command" Value="{x:Static markdig:Commands.Hyperlink}" />
+		<Setter Property="CommandParameter" Value="{Binding RelativeSource={RelativeSource Self}, Path=NavigateUri}" />
+	</Style>
+	<Style TargetType="{x:Type Paragraph}" x:Key="{x:Static markdig:Styles.Heading1StyleKey}">
     <Setter Property="FontSize" Value="42" />
     <Setter Property="Foreground" Value="#ff000000" />
     <Setter Property="FontWeight" Value="Bold" />

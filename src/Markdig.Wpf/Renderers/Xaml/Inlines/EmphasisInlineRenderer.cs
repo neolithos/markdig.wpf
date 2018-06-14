@@ -3,6 +3,7 @@
 // See the LICENSE.md file in the project root for more information.
 
 using System;
+using System.Windows.Documents;
 using Markdig.Annotations;
 using Markdig.Syntax.Inlines;
 
@@ -14,44 +15,44 @@ namespace Markdig.Renderers.Xaml.Inlines
     /// <seealso cref="Xaml.XamlObjectRenderer{T}" />
     public class EmphasisInlineRenderer : XamlObjectRenderer<EmphasisInline>
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="EmphasisInlineRenderer"/> class.
-        /// </summary>
-        public EmphasisInlineRenderer()
-        {
+        /// <summary></summary>
+        /// <param name="renderer"></param>
+        /// <param name="span"></param>
+		protected override void Write([NotNull] XamlRenderer renderer, EmphasisInline span)
+		{
+            var spanType = typeof(Span);
+            
+            switch (span.DelimiterChar)
+            {
+                case '*':
+                case '_':
+                    spanType = span.IsDouble ? typeof(Bold) : typeof(Italic);
+                    break;
+            }
+
+            renderer.WriteStartObject(spanType);
+
+            switch (span.DelimiterChar)
+            {
+                case '~':
+                    if (span.IsDouble)
+                        renderer.WriteStaticResourceMember(null, "markdig:Styles.StrikeThroughStyleKey");
+                    else
+                        goto case '^';
+                    break;
+                case '^':
+                    renderer.WriteStaticResourceMember(null, "markdig:Styles.SuperscriptStyleKey");
+                    break;
+                case '+':
+                    renderer.WriteStaticResourceMember(null, "markdig:Styles.InsertedStyleKey");
+                    break;
+                case '=':
+                    renderer.WriteStaticResourceMember(null, "markdig:Styles.MarkedStyleKey");
+                    break;
+            }
+            
+            renderer.WriteItems(span);
+            renderer.WriteEndObject();
         }
-
-		[NotNull]
-		private IDisposable BeginSpan([NotNull] XamlRenderer renderer, EmphasisInline obj)
-		{
-			switch (obj.DelimiterChar)
-			{
-				case '*':
-				case '_':
-					return obj.IsDouble
-						? renderer.BeginBold()
-						: renderer.BeginItalic();
-				case '~':
-					return renderer.BeginSpan(obj.IsDouble
-						? "markdig:Styles.StrikeThroughStyleKey"
-						: "markdig:Styles.SubscriptStyleKey");
-				case '^':
-					return renderer.BeginSpan("markdig:Styles.SubscriptStyleKey");
-				case '+':
-					return renderer.BeginSpan("markdig:Styles.InsertedStyleKey");
-				case '=':
-					return renderer.BeginSpan("markdig:Styles.MarkedStyleKey");
-				default:
-					return renderer.BeginSpan();
-			}
-		}
-
-		protected override void Write([NotNull] XamlRenderer renderer, EmphasisInline obj)
-		{
-			using (BeginSpan(renderer, obj))
-			{
-				renderer.WriteChildren(obj);
-			}
-		}
     }
 }

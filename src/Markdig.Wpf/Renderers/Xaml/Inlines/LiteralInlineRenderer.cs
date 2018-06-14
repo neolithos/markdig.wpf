@@ -13,12 +13,15 @@ namespace Markdig.Renderers.Xaml.Inlines
     /// <seealso cref="Xaml.XamlObjectRenderer{T}" />
     public class LiteralInlineRenderer : XamlObjectRenderer<LiteralInline>
     {
+        /// <summary></summary>
+        /// <param name="renderer"></param>
+        /// <param name="obj"></param>
         protected override void Write([NotNull] XamlRenderer renderer, [NotNull] LiteralInline obj)
         {
             if (obj.Content.IsEmpty)
                 return;
 
-			renderer.WriteText(ref obj.Content);
+            renderer.WriteText(ref obj.Content);
         }
     }
 }

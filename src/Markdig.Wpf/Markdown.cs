@@ -30,18 +30,14 @@ namespace Markdig.Wpf
             if (markdown == null) throw new ArgumentNullException(nameof(markdown));
             pipeline = pipeline ?? new MarkdownPipelineBuilder().Build();
 
-            // We override the renderer with our own writer
-            var renderer = new XamlRenderer();
-            pipeline.Setup(renderer);
+            using (var writer = new XamlObjectWriter(System.Windows.Markup.XamlReader.GetWpfSchemaContext()))
+            {
+                var renderer = new XamlRenderer(writer);
+                pipeline.Setup(renderer);
 
-            var document = Markdig.Markdown.Parse(markdown, pipeline);
-			using (var xamlReader = (XamlReader)renderer.Render(document))
-			using (var xamlWriter = new XamlObjectWriter(xamlReader.SchemaContext))
-			{
-				XamlServices.Transform(xamlReader, xamlWriter);
-
-				return (FlowDocument)xamlWriter.Result;
-			}
+                var document = Markdig.Markdown.Parse(markdown, pipeline);
+                return (FlowDocument)renderer.Render(document);
+            }
         }
 
         /// <summary>
@@ -75,20 +71,18 @@ namespace Markdig.Wpf
             if (writer == null) throw new ArgumentNullException(nameof(writer));
             pipeline = pipeline ?? new MarkdownPipelineBuilder().Build();
 
-            // We override the renderer with our own writer
-            var renderer = new XamlRenderer();
-            pipeline.Setup(renderer);
 
-            var document = Markdig.Markdown.Parse(markdown, pipeline);
-			using (var xamlReader = (XamlReader)renderer.Render(document))
-			using (var xamlWriter = new XamlXmlWriter(writer, xamlReader.SchemaContext))
-			{
-				XamlServices.Transform(xamlReader, xamlWriter, false);
-				xamlWriter.Flush();
-			}
+            using (var xamlWriter = new XamlXmlWriter(writer, System.Windows.Markup.XamlReader.GetWpfSchemaContext()))
+            {
+                var renderer = new XamlRenderer(xamlWriter);
+                pipeline.Setup(renderer);
 
+                var document = Markdig.Markdown.Parse(markdown, pipeline);
+                renderer.Render(document);
 
-            return document;
+                xamlWriter.Flush();
+                return document;
+            }
         }
     }
 }

@@ -114,5 +114,10 @@ namespace Markdig.Wpf
         /// Resource Key for the ThematicBreakStyle.
         /// </summary>
         public static ComponentResourceKey ThematicBreakStyleKey { get; } = new ComponentResourceKey(typeof(Styles), nameof(ThematicBreakStyleKey));
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public static ComponentResourceKey HyperlinkStyleKey { get; } = new ComponentResourceKey(typeof(Styles), nameof(HyperlinkStyleKey));
     }
 }

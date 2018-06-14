@@ -2,6 +2,7 @@
 // This file is licensed under the MIT license.
 // See the LICENSE.md file in the project root for more information.
 
+using System.Windows.Documents;
 using Markdig.Annotations;
 using Markdig.Syntax;
 
@@ -13,18 +14,17 @@ namespace Markdig.Renderers.Xaml
     /// <seealso cref="Xaml.XamlObjectRenderer{T}" />
     public class QuoteBlockRenderer : XamlObjectRenderer<QuoteBlock>
     {
-        protected override void Write([NotNull] XamlRenderer renderer, QuoteBlock obj)
+        /// <summary></summary>
+        /// <param name="renderer"></param>
+        /// <param name="block"></param>
+        protected override void Write([NotNull] XamlRenderer renderer, QuoteBlock block)
         {
-			using (renderer.BeginParagraph(null))
-				renderer.WriteText("Todo Section");
-            //renderer.EnsureLine();
+            renderer.WriteStartObject(typeof(Section));
+            renderer.WriteStaticResourceMember(null, "markdig:Styles.QuoteBlockStyleKey");
 
-            //renderer.Write("<Section");
-            //// Apply quote block styling
-            //renderer.Write(" Style=\"{StaticResource {x:Static markdig:Styles.QuoteBlockStyleKey}}\"");
-            //renderer.WriteLine(">");
-            //renderer.WriteChildren(obj);
-            //renderer.WriteLine("</Section>");
+            renderer.WriteItems(block);
+
+            renderer.WriteEndObject();
         }
     }
 }
