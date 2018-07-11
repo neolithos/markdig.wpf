@@ -15,44 +15,52 @@ namespace Markdig.Renderers.Xaml.Inlines
     /// <seealso cref="Xaml.XamlObjectRenderer{T}" />
     public class EmphasisInlineRenderer : XamlObjectRenderer<EmphasisInline>
     {
+        private static bool WriteSpan(XamlRenderer renderer, EmphasisInline span)
+        {
+            switch (span.DelimiterChar)
+            {
+                case '*': // bold
+                    renderer.WriteStartObject(typeof(Bold));
+                    return true;
+                case '_': // italic
+                    renderer.WriteStartObject(typeof(Italic));
+                    return true;
+                case '~': // strike through
+                    renderer.WriteStartObject(typeof(Span));
+                    renderer.WriteStaticResourceMember(null, "markdig:Styles.StrikeThroughStyleKey")
+                    return true;
+                case '^': // superscript, subscript
+                    renderer.WriteStartObject(typeof(Span));
+                    if (span.IsDouble)
+                        renderer.WriteStaticResourceMember(null, "markdig:Styles.SuperscriptStyleKey");
+                    else
+                        renderer.WriteStaticResourceMember(null, "markdig:Styles.SubscriptStyleKey");
+                    return true;
+                case '+': // underline
+                    renderer.WriteStartObject(typeof(Span));
+                    renderer.WriteStaticResourceMember(null, "markdig:Styles.InsertedStyleKey");
+                    return true;
+                case '=': // Marked
+                    renderer.WriteStartObject(typeof(Span));
+                    renderer.WriteStaticResourceMember(null, "markdig:Styles.MarkedStyleKey");
+                    return true;
+                default:
+                    return false;
+            }
+        } // proc WriteSpan
+
         /// <summary></summary>
         /// <param name="renderer"></param>
         /// <param name="span"></param>
 		protected override void Write([NotNull] XamlRenderer renderer, EmphasisInline span)
 		{
-            var spanType = typeof(Span);
-            
-            switch (span.DelimiterChar)
+            if (WriteSpan(renderer, span))
             {
-                case '*':
-                case '_':
-                    spanType = span.IsDouble ? typeof(Bold) : typeof(Italic);
-                    break;
+                renderer.WriteItems(span);
+                renderer.WriteEndObject();
             }
-
-            renderer.WriteStartObject(spanType);
-
-            switch (span.DelimiterChar)
-            {
-                case '~':
-                    if (span.IsDouble)
-                        renderer.WriteStaticResourceMember(null, "markdig:Styles.StrikeThroughStyleKey");
-                    else
-                        goto case '^';
-                    break;
-                case '^':
-                    renderer.WriteStaticResourceMember(null, "markdig:Styles.SuperscriptStyleKey");
-                    break;
-                case '+':
-                    renderer.WriteStaticResourceMember(null, "markdig:Styles.InsertedStyleKey");
-                    break;
-                case '=':
-                    renderer.WriteStaticResourceMember(null, "markdig:Styles.MarkedStyleKey");
-                    break;
-            }
-            
-            renderer.WriteItems(span);
-            renderer.WriteEndObject();
+            else
+                renderer.WriteChildren(span);
         }
     }
 }
