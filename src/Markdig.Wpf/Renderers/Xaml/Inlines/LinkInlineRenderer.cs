@@ -32,6 +32,8 @@ namespace Markdig.Renderers.Xaml.Inlines
 
                 renderer.WriteStartObject(typeof(Image));
                 renderer.WriteStaticResourceMember(null, "markdig:Styles.ImageStyleKey");
+                if (!String.IsNullOrEmpty(link.Title))
+                    renderer.WriteMember(ToolTipService.ToolTipProperty, link.Title);
                 renderer.WriteMember(Image.SourceProperty, new Uri(url, UriKind.RelativeOrAbsolute));
                 renderer.WriteEndObject();
             }

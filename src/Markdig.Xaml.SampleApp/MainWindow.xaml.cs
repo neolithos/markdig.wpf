@@ -34,6 +34,7 @@ namespace Markdig.Xaml.SampleApp
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
+			//var markdown = File.ReadAllText(@"C:\Projects\NeoLua\Readme.md");
 			var markdown = File.ReadAllText("Documents/Markdig-readme.md");
 			var xaml = Wpf.Markdown.ToXaml(markdown, BuildPipeline());
 			//File.WriteAllText("d:\\temp\\text.xml", xaml);

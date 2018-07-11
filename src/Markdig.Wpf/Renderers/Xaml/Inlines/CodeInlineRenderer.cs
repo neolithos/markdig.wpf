@@ -21,7 +21,7 @@ namespace Markdig.Renderers.Xaml.Inlines
         {
             renderer.WriteStartObject(typeof(Span));
             renderer.WriteStaticResourceMember(null, "markdig:Styles.CodeStyleKey");
-
+            
             renderer.WriteStartItems(nameof(Span.Inlines), true);
             renderer.WriteText(code.Content);
             renderer.WriteEndItems();

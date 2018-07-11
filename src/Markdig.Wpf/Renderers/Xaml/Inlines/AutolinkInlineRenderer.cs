@@ -23,9 +23,13 @@ namespace Markdig.Renderers.Xaml.Inlines
         protected override void Write([NotNull] XamlRenderer renderer, [NotNull] AutolinkInline link)
         {
             var url = link.Url;
+            var title = url;
 
-            LinkInlineRenderer.WriteStartHyperlink(renderer, url, url);
-            renderer.WriteText(url);
+            if (link.IsEmail)
+                url = "mailto:" + url;
+
+            LinkInlineRenderer.WriteStartHyperlink(renderer, url, title);
+            renderer.WriteText(title);
             LinkInlineRenderer.WriteEndHyperlink(renderer);
         }
     }

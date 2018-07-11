@@ -67,11 +67,13 @@ namespace Markdig.Wpf
         public static MarkdownDocument ToXaml([NotNull] string markdown, [NotNull] TextWriter writer,
             [CanBeNull] MarkdownPipeline pipeline = null)
         {
-            if (markdown == null) throw new ArgumentNullException(nameof(markdown));
-            if (writer == null) throw new ArgumentNullException(nameof(writer));
+            if (markdown == null)
+                throw new ArgumentNullException(nameof(markdown));
+            if (writer == null)
+                throw new ArgumentNullException(nameof(writer));
+
             pipeline = pipeline ?? new MarkdownPipelineBuilder().Build();
-
-
+            
             using (var xamlWriter = new XamlXmlWriter(writer, System.Windows.Markup.XamlReader.GetWpfSchemaContext()))
             {
                 var renderer = new XamlRenderer(xamlWriter);

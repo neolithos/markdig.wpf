@@ -2,6 +2,7 @@
 // This file is licensed under the MIT license.
 // See the LICENSE.md file in the project root for more information.
 
+using System.Windows.Documents;
 using Markdig.Annotations;
 using Markdig.Syntax;
 
@@ -18,6 +19,10 @@ namespace Markdig.Renderers.Xaml
         /// <param name="obj"></param>
         protected override void Write([NotNull] XamlRenderer renderer, ThematicBreakBlock obj)
         {
+            renderer.WriteStartObject(typeof(Paragraph));
+            renderer.WriteStaticResourceMember(null, "markdig:Styles.ThematicBreakStyleKey");
+            renderer.WriteEndObject();
+
             //var line = new System.Windows.Shapes.Line { X2 = 1 };
             //line.SetResourceReference(FrameworkContentElement.StyleProperty, Styles.ThematicBreakStyleKey);
 

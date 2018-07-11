@@ -21,6 +21,8 @@ namespace Markdig.Renderers.Xaml
         {
             renderer.WriteStartObject(typeof(Paragraph));
             renderer.WriteStaticResourceMember(null, "markdig:Styles.CodeBlockStyleKey");
+            //if (obj is FencedCodeBlock f)
+            //    f.Info;
             renderer.WriteItems(obj, true);
             renderer.WriteEndObject();
         }

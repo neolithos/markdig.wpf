@@ -3,7 +3,7 @@
                     xmlns:markdig="clr-namespace:Markdig.Wpf">
   <!-- Document styles -->
   <Style TargetType="{x:Type FlowDocument}" x:Key="{x:Static markdig:Styles.DocumentStyleKey}">
-    <Setter Property="FontFamily" Value="Calibri" />
+		<Setter Property="FontFamily" Value="Segoe UI" />
     <Setter Property="TextAlignment" Value="Left" />
   </Style>
   <Style TargetType="{x:Type List}">
@@ -74,10 +74,12 @@
   <Style TargetType="{x:Type CheckBox}" x:Key="{x:Static markdig:Styles.TaskListStyleKey}">
     <Setter Property="Margin" Value="0,0,0,-2" />
   </Style>
-  <Style TargetType="{x:Type Line}" x:Key="{x:Static markdig:Styles.ThematicBreakStyleKey}">
-    <Setter Property="Stretch" Value="Fill" />
-    <Setter Property="Stroke" Value="Black" />
-  </Style>
+  <Style TargetType="{x:Type Paragraph}" x:Key="{x:Static markdig:Styles.ThematicBreakStyleKey}">
+		<Setter Property="BorderBrush" Value="DarkGray"/>
+		<Setter Property="BorderThickness" Value="0,0,0,1"/>
+		<Setter Property="LineHeight" Value="1" />
+		<Setter Property="Margin" Value="3cm,0" />
+	</Style>
   <Style TargetType="{x:Type Span}" x:Key="{x:Static markdig:Styles.SubscriptStyleKey}">
     <Setter Property="Typography.Variants" Value="Subscript" />
   </Style>
