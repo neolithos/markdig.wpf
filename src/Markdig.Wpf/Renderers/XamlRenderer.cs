@@ -26,7 +26,7 @@ namespace Markdig.Renderers
     /// XAML renderer for a Markdown <see cref="MarkdownDocument"/> object.
     /// </summary>
     public class XamlRenderer : RendererBase
-	{
+    {
         private readonly XamlWriter writer;
         private readonly Stack<XamlType> xamlTypes = new Stack<XamlType>();
 
@@ -49,7 +49,7 @@ namespace Markdig.Renderers
             this.writer = writer ?? throw new ArgumentNullException(nameof(writer));
 
             this.runType = SchemaContext.GetXamlType(typeof(Run)) ?? throw new ArgumentNullException(nameof(Run));
-            this.runTextMember = runType.GetMember(nameof(Run.Text))??throw new ArgumentNullException(nameof(Run.Text));
+            this.runTextMember = runType.GetMember(nameof(Run.Text)) ?? throw new ArgumentNullException(nameof(Run.Text));
 
             // Default block renderers
             ObjectRenderers.Add(new CodeBlockRenderer());
@@ -64,6 +64,7 @@ namespace Markdig.Renderers
             ObjectRenderers.Add(new CodeInlineRenderer());
             ObjectRenderers.Add(new DelimiterInlineRenderer());
             ObjectRenderers.Add(new EmphasisInlineRenderer());
+            ObjectRenderers.Add(new EntityInlineRenderer());
             ObjectRenderers.Add(new LineBreakInlineRenderer());
             ObjectRenderers.Add(new LinkInlineRenderer());
             ObjectRenderers.Add(new LiteralInlineRenderer());
@@ -75,6 +76,16 @@ namespace Markdig.Renderers
 
         #region -- Primitives ---------------------------------------------------------
 
+        /// <summary></summary>
+        /// <param name="ns"></param>
+        /// <param name="prefix"></param>
+        public void WriteNamespace(string ns, string prefix)
+            => WriteNamespace(new NamespaceDeclaration(ns, prefix));
+
+        /// <summary></summary>
+        public void WriteNamespace(NamespaceDeclaration namespaceDeclaration)
+            => writer.WriteNamespace(namespaceDeclaration);
+
         /// <summary>Start to write a xaml-object.</summary>
         /// <param name="type"></param>
         public XamlType WriteStartObject([NotNull] Type type)
@@ -85,7 +96,10 @@ namespace Markdig.Renderers
             return WriteStartObject(xamlType);
         }
 
-        private XamlType WriteStartObject(XamlType xamlType)
+        /// <summary>Start to write a xaml-object.</summary>
+        /// <param name="xamlType"></param>
+        /// <returns></returns>
+        public XamlType WriteStartObject(XamlType xamlType)
         {
             xamlTypes.Push(xamlType);
 
@@ -97,6 +111,10 @@ namespace Markdig.Renderers
 
             return xamlType;
         }
+
+        /// <summary>Write GetObject</summary>
+        public void WriteGetObject()
+            => writer.WriteGetObject();
 
         /// <summary>Closes the current object.</summary>
         /// <returns>Current evaluated object or null.</returns>
@@ -379,7 +397,7 @@ namespace Markdig.Renderers
                         WriteLineBreak();
                     else
                         AppendChar(' ');
-                    
+
                     WriteText(ref leafBlock.Lines.Lines[i].Slice);
                 }
             }
@@ -423,22 +441,22 @@ namespace Markdig.Renderers
         /// <param name="markdownObject"></param>
         /// <returns></returns>
         [NotNull]
-		public override object Render(MarkdownObject markdownObject)
-		{
+        public override object Render(MarkdownObject markdownObject)
+        {
             if (markdownObject is MarkdownDocument)
             {
                 // emit namespaces
-                writer.WriteNamespace(new NamespaceDeclaration("http://schemas.microsoft.com/winfx/2006/xaml", "x"));
-                writer.WriteNamespace(new NamespaceDeclaration("clr-namespace:Markdig.Wpf;assembly=Markdig.Wpf", "markdig"));
+                WriteNamespace("http://schemas.microsoft.com/winfx/2006/xaml", "x");
+                WriteNamespace("clr-namespace:Markdig.Wpf;assembly=Markdig.Wpf", "markdig");
 
                 // start flow document
                 WriteStartObject(typeof(FlowDocument));
 
                 //WriteStartItems(nameof(FlowDocument.Resources));
                 //WriteEndItems();
-                
-                 WriteStaticResourceMember(null, "markdig:Styles.DocumentStyleKey");
-                
+
+                WriteStaticResourceMember(null, "markdig:Styles.DocumentStyleKey");
+
                 WriteStartItems(nameof(FlowDocument.Blocks));
 
                 Write(markdownObject);
@@ -451,7 +469,7 @@ namespace Markdig.Renderers
                 Write(markdownObject);
                 return GetResult();
             }
-	    }
+        }
 
         /// <summary>Acces to current schema context.</summary>
         public XamlSchemaContext SchemaContext => writer.SchemaContext;

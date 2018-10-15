@@ -61,6 +61,7 @@
     <Compile Include="Renderers\Xaml\Inlines\CodeInlineRenderer.cs" />
     <Compile Include="Renderers\Xaml\Inlines\DelimiterInlineRenderer.cs" />
     <Compile Include="Renderers\Xaml\Inlines\EmphasisInlineRenderer.cs" />
+    <Compile Include="Renderers\Xaml\Inlines\EntityInlineRenderer.cs" />
     <Compile Include="Renderers\Xaml\Inlines\LineBreakInlineRenderer.cs" />
     <Compile Include="Renderers\Xaml\Inlines\LinkInlineRenderer.cs" />
     <Compile Include="Renderers\Xaml\Inlines\LiteralInlineRenderer.cs" />
