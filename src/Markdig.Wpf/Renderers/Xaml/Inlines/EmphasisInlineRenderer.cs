@@ -27,7 +27,7 @@ namespace Markdig.Renderers.Xaml.Inlines
                     return true;
                 case '~': // strike through
                     renderer.WriteStartObject(typeof(Span));
-                    renderer.WriteStaticResourceMember(null, "markdig:Styles.StrikeThroughStyleKey")
+                    renderer.WriteStaticResourceMember(null, "markdig:Styles.StrikeThroughStyleKey");
                     return true;
                 case '^': // superscript, subscript
                     renderer.WriteStartObject(typeof(Span));
